@@ -1,0 +1,244 @@
+---
+title: "Project 3"
+author: "Jake Brophy,Wooin Lee,Frederick Kiaie,Zakary Lang"
+date: "11/29/2021"
+output: pdf_document
+---
+UID:
+Jake Brophy: 305-088-618
+Wooin Lee: 304-488-514
+Frederick Kiaie: 105-113-992
+Zakary Lang: 904-928-727
+
+Setup:
+
+```{r setup}
+library(plm)
+library(knitr)
+library(broom)
+library(tidyverse)
+library(stargazer)
+library(lmtest)
+library(wooldridge)
+library(gplots)
+data('rental')
+attach(rental)
+library(corrplot)
+library(MASS)
+rental_p <- pdata.frame(rental, index = c('city','year'))
+```
+
+part I
+
+Question 1:
+
+Our objective is to understand the features that impact our dependent variable, rent (we used the variable, lrent, which is the log of rent) across college towns (N) for multiple time periods 1980 or 1990 (T), and we are interested in understanding if one of the features, i.e. student population, is a significant factor for rent.
+
+
+Data explanation: Data for 64 “college towns” from the 1980 and 1990 United States censuses. 
+• city: city label, 1 to 64
+• year: 80 or 90
+• lenroll: log(enroll)
+• lpop: log(pop)
+• lrent: log(rent)
+• ltothsg: log(tothsg)
+• lrnthsg: log(rnthsg)
+• lavginc: log(avginc)
+• pctstu: percent of population students 
+
+Question2:
+
+```{r}
+rental2 <- subset(rental, select = c(city, lenroll, lpop, lrent, ltothsg, 
+                                      lrnthsg, lavginc, pctstu))
+
+cor <- cor(rental2)
+corrplot(cor)
+
+library(reshape)
+meltData2 <- melt(rental2)
+p <- ggplot(meltData2, aes(factor(variable), value)) 
+p + geom_boxplot() + facet_wrap(~variable, scale="free")
+
+
+```
+From the correlation plot, we can see that the variable most correlated with rent is average income which makes intuitive economic sense, followed by the number of students enrolled in a college in a city.
+
+From the boxplots of our variables of interest, we can see that our variables have relatively few outliers. Notable exceptions include the log of total occupied housing units, lag of total renter occupied housing units, and percentage of population that is students. 
+
+
+```{r, fig.height=10, fig.width=20, message=FALSE, warning=FALSE}
+par(mfrow = c(4,4))
+for(i in 1:8) {
+  fit <- fitdistr(rental[,i], densfun="normal")
+  hist(rental[,i], pch=30, breaks=40, prob = TRUE, main = names(rental)[i])
+  curve(dnorm(x, fit$estimate[1], fit$estimate[2]), col="blue", add=T)
+}
+```
+From the histogram of population, most towns have around 500,000 residents.
+
+We can see that the number of college students enrolled in a city is on average between 10,000 and 25,000 with some outliers having as many as 70,000
+
+Rent is more irregularly distributed, with most cities having rent that falls between 200 and 400 dollars
+
+Unsurprisingly, we see that both total occupied housing units and total occupied rental units have similar distributions, clumping around 1,000 for renters and 100,000 for total. 
+
+Per capita income is also irregularly distributed, with most cities having income between $10,000 and $20,000 
+
+
+Question 3:
+
+```{r pressure, echo=FALSE}
+ols <- lm(lrent~year + lpop + lavginc + pctstu + lenroll 
+          + ltothsg + lrnthsg, data = rental)
+pooled <- plm(lrent~year + lpop + lavginc + pctstu + lenroll 
+          + ltothsg + lrnthsg, data = rental,model = 'pooling', index =c('city','year'))
+fe <- plm(lrent~year + lpop + lavginc + pctstu + lenroll 
+          + ltothsg + lrnthsg, data = rental_p,
+          model = 'within')
+
+pFtest(fe, pooled)
+re <- plm(lrent~year + lpop + lavginc + pctstu + lenroll 
+          + ltothsg + lrnthsg, data = rental_p,
+          model = 'random')
+phtest(fe, re)
+```
+
+When we  looked at the pooled model - “one-size-fits-all”/“one common beta across time and individuals''-, two plots (lrent~year vs. lrent~city) suggest that there are differences over time and differences over individuals. Thus, we eliminated pooled models from our preferred one. 
+
+We came to this conclusion using the pFtest() function which tests for individual or time differences, and given a p-value of 9.114e-12 we reject the null hypothesis of no individual or time effects and decide fixed effects are present.
+
+Next, between choosing fixed effects (FE) and random effects models (RE), we ran the Hausman Test and since p-value is less than 0.05, we reject H0 ("RE is better than FE") and choose the Fixed Effects Model instead.
+
+```{r, fig.height=10, fig.width=20, message=FALSE, warning=FALSE}
+library('effects')
+plot(allEffects(pooled))
+plot(allEffects(re))
+```
+From the effects plot, we can see that both for both the pooled and random effects model, the strongest effect on rent came from year and average income which makes sense since properties become more expensive over time and in areas with a high average income. In general, the direction of the effects stays consistent in both models, but in the random effects model we can much more clearly see the effect than in the pooled model.
+
+Part II
+
+Question 1:
+
+The model consisted of data on the S&P 500 that was obtained from Yahoo Finance. The variables of interest were, Year: The year that the observation was recorded, Lag1: Percentage return for previous day, Lag2: Percentage return for 2 days previous, Lag3: Percentage return for 3 days previous, Lag4: Percentage return for 4 days previous, Lag5: Percentage return for 5 days previous, Volume: Volume of shares traded (number of daily shares traded in billions), and Direction: A factor with levels Down and Up indicating whether the market had a positive or negative return on a given day. The model attempted to predict variable Direction. 
+
+Question 2:
+
+```{r}
+require(ISLR)
+names(Smarket)
+data("Smarket")
+summary(Smarket)
+par(mfrow = c(4,4))
+
+library(dplyr)
+market <- Smarket
+market <- market%>%
+  mutate(Direction=case_when(
+    Direction=="Up" ~ 1,
+    Direction=="Down" ~ 0,
+  ))
+library(reshape)
+library(ggplot2)
+meltData <- melt(Smarket)
+p <- ggplot(meltData, aes(factor(variable), value)) 
+p + geom_boxplot() + facet_wrap(~variable, scale="free")
+```
+
+
+
+```{r}
+cor2 <- cor(market)
+corrplot(cor2)
+```
+
+
+```{r, fig.height=10, fig.width=20, message=FALSE, warning=FALSE}
+par(mfrow = c(4,4))
+for(i in 1:8) {
+  fit <- fitdistr(Smarket[,i], densfun="normal")
+  hist(Smarket[,i], pch=30, breaks=40, prob = TRUE, main = names(Smarket)[i])
+  curve(dnorm(x, fit$estimate[1], fit$estimate[2]), col="blue", add=T)
+}
+```
+
+For the year variable, data is collected from 2001 to 2005. Each day has an approximate median 0.04% return, with a maximum of a 5.7% return and a minimum of a -4.9% return. The median volume for a trading day is approximately 1.4 billion shares with a high of 3.1 billion and a low of 0.4 billion. The market had a positive return for 52% of the days. All lag variables have similar values as they contain the same data just offset by a number of days. The fitted distribution/histograms seem to have a very smooth normal data trend as expected. From the correlation plot, it can be seen that the volume and the year have a strong correlation. Direction is weakly correlated with the first 2 lags, year and volume. 
+
+
+```{r}
+ols.mod <- lm(Direction ~ Lag1 + Lag2 +Lag3 + Lag4 + Lag5, data = market)
+summary(ols.mod)
+ols.pred.classes <- ifelse(fitted(ols.mod) > 0.5, 1, 0)
+table(ols.pred.classes, market$Direction)
+mean(ols.pred.classes == market$Direction)
+
+probit.mod = glm(Direction ~ Lag1 + Lag2 +Lag3 + Lag4 + Lag5, family=binomial(link="probit"),
+                 data=market)
+summary(probit.mod)
+probit.pred.classes <- ifelse(fitted(probit.mod) > 0.5, 1, 0)
+table(probit.pred.classes, market$Direction)
+mean(probit.pred.classes == market$Direction)
+
+logit.mod = glm(Direction ~ Lag1 + Lag2 +Lag3 + Lag4 + Lag5, family=binomial(link="logit"),
+                data=market)
+summary(logit.mod)
+logit.pred.classes <- ifelse(fitted(logit.mod) > 0.5, 1, 0)
+table(logit.pred.classes, market$Direction)
+mean(logit.pred.classes == market$Direction)
+```
+
+In general, we prefer probit and logit over linear probability models when dealing with binary explanatory variables because of the S curve that keeps things bounded and we can use this threshold to predict binary choices (by observing if it crosses the threshold or not). 
+
+The logit model is the preferred model because when we evaluated each model’s predictions of whether the market would end up or down for the day, the logit got the most correct at 53.28% compared to the probit model which got 53.04% and the linear model which got 53.12% correct. 
+
+```{r}
+library('effects')
+nels.all <- allEffects(logit.mod)
+plot(nels.all, style = 'stacked', colors = c('skyblue1', 'skyblue3', 'skyblue4'), rug = FALSE)
+```
+
+In terms of Effects plot, we see an interesting trend in the logit model where the first two lags seem to have a negative effect on the direction of the market while the other three have a positive, which suggests that at this time the market may be in a decline at least since the last two lags. 
+
+
+```{r}
+library(caret)
+inTraining <- createDataPartition(Smarket$Direction, p = .75, list = FALSE)
+training <- Smarket[ inTraining,]
+testing  <- Smarket[-inTraining,]
+train_control <- trainControl(method = "cv",
+                              number = 5)
+logit_model1 <- train(as.factor(Direction) ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume,
+                     data = training,
+                     method = "glm",
+                     family = "binomial",
+                     trControl = train_control)
+pred_market1 <- predict(logit_model1, newdata = testing)
+confusionMatrix(data=pred_market1, reference=as.factor(testing$Direction))
+
+logit_model2 <- train(as.factor(Direction) ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5,
+                      data = training,
+                      method = "glm",
+                      family = "binomial",
+                      trControl = train_control)
+pred_market2 <- predict(logit_model2, newdata = testing)
+confusionMatrix(data=pred_market2, reference=as.factor(testing$Direction))
+
+logit_model3 <- train(as.factor(Direction) ~ Lag1 + Lag2 + Lag3 + Lag4,
+                      data = training,
+                      method = "glm",
+                      family = "binomial",
+                      trControl = train_control)
+pred_market3 <- predict(logit_model3, newdata = testing)
+confusionMatrix(data=pred_market3, reference=as.factor(testing$Direction))
+
+logit_model4 <- train(as.factor(Direction) ~ Lag1 + Lag2 + Lag3,
+                      data = training,
+                      method = "glm",
+                      family = "binomial",
+                      trControl = train_control)
+pred_market4 <- predict(logit_model4, newdata = testing)
+confusionMatrix(data=pred_market4, reference=as.factor(testing$Direction))
+```
+
+The most accurate prediction was our 4th model which consistently predicted above the no-information rate of 51.92%. The model only took into account 3 lags and left out lag4, lag5, and the volume of trading on a given day. Overall, the only other model that consistently beat the no information rate was the first one, which used lags 1-5 and the volume of trading in a given day. Given this information, I’d say that our models were fairly accurate especially given the difficulty of predicting the stock market. 
