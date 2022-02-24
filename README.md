@@ -2,4 +2,4 @@
 https://akejay526.github.io/Panel-Data-and-Logistic-Regression-Models/
 
 In the first part of this project, I analyzed rent data across ten years in college towns in the US using pooled, fixed effect, and random effect models.
-In the second part, I used logistic regression to analyze stock market data from the S&P 500 to generate an accurate predicitive model
+In the second part, I used logistic regression to analyze stock market data from the S&P 500 to generate a model that predicted whether the stock market would end up or down relative to the previous day
